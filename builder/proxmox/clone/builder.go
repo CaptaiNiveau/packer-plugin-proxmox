@@ -56,7 +56,7 @@ type cloneVMCreator struct{}
 func (*cloneVMCreator) Create(vmRef *proxmoxapi.VmRef, config proxmoxapi.ConfigQemu, state multistep.StateBag) error {
 	client := state.Get("proxmoxClient").(*proxmoxapi.Client)
 	c := state.Get("clone-config").(*Config)
-	comm := state.Get("config").(*proxmox.Config).Comm
+	common := state.Get("config").(*proxmox.Config)
 
 	fullClone := 1
 	if c.FullClone.False() {
@@ -124,18 +124,24 @@ func (*cloneVMCreator) Create(vmRef *proxmoxapi.VmRef, config proxmoxapi.ConfigQ
 
 	var publicKey []crypto.PublicKey
 
-	if comm.SSHPublicKey != nil {
-		publicKey = append(publicKey, crypto.PublicKey(string(comm.SSHPublicKey)))
+	if common.Comm.SSHPublicKey != nil {
+		publicKey = append(publicKey, crypto.PublicKey(string(common.Comm.SSHPublicKey)))
+	}
+
+	upgradePackages := true
+	if common.CloudInitDisableUpgradePackages {
+		upgradePackages = false
 	}
 
 	config.CloudInit = &proxmoxapi.CloudInit{
-		Username:      &comm.SSHUsername,
+		Username:      &common.Comm.SSHUsername,
 		PublicSSHkeys: &publicKey,
 		DNS: &proxmoxapi.GuestDNS{
 			NameServers:  &nameServers,
 			SearchDomain: &c.Searchdomain,
 		},
 		NetworkInterfaces: IpconfigMap,
+		UpgradePackages:   &upgradePackages,
 	}
 
 	var sourceVmr *proxmoxapi.VmRef
